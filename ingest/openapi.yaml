@@ -1,0 +1,899 @@
+openapi: 3.0.3
+info:
+  title: Spendl Ingest API
+  version: 1.0.0
+  description: |
+    Public API for ingesting and validating users in Spendl. 
+    Authentication uses API key/secret exchange for a Bearer JWT with scopes for authorization control.
+servers:
+  - url: https://ingest.spendl.money
+    description: Production
+  - url: https://ingest.staging.spendl.money
+    description: Staging
+  - url: http://localhost:3000
+    description: Local
+security:
+  - {}
+tags:
+  - name: Auth
+  - name: Ingestor
+  - name: KYC
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [message, code, type]
+          properties:
+            message:
+              type: string
+            code:
+              type: integer
+            type:
+              type: string
+    ApiKeyCreateRequest:
+      type: object
+      properties:
+        scopes:
+          type: array
+          items:
+            type: string
+          default: [read, write]
+        expiresInDays:
+          type: integer
+          minimum: 1
+        label:
+          type: string
+          maxLength: 100
+    ApiKeyCreateResponse:
+      type: object
+      required: [apiKeyId, apiKey, apiSecret, scopes, warning]
+      properties:
+        apiKeyId:
+          type: string
+        apiKey:
+          type: string
+        apiSecret:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        label:
+          type: string
+          nullable: true
+        warning:
+          type: string
+    TokenRequest:
+      type: object
+      required: [apiKey, apiSecret]
+      properties:
+        apiKey:
+          type: string
+        apiSecret:
+          type: string
+    TokenResponse:
+      type: object
+      required: [accessToken, expiresIn, tokenType]
+      properties:
+        accessToken:
+          type: string
+          description: Bearer JWT
+        expiresIn:
+          type: integer
+          description: Expiry in seconds
+        tokenType:
+          type: string
+          enum: [Bearer]
+    EmailPreferences:
+      type: object
+      properties:
+        login: { type: boolean }
+        deposit: { type: boolean }
+        trade: { type: boolean }
+        topup: { type: boolean }
+    Preferences:
+      type: object
+      properties:
+        email: { $ref: '#/components/schemas/EmailPreferences' }
+        twoFactor: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    UserDetails:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, nullable: true }
+        emailConfirmation: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [active, inactive, suspended, pending]
+          default: pending
+    S3Keys:
+      type: object
+      description: |
+        KYC document upload history per document type. Each document type contains an array
+        of upload records with full history. Retrieve the latest upload via array.at(-1).
+      additionalProperties:
+        type: array
+        items:
+          $ref: '#/components/schemas/KycUpload'
+      properties:
+        idProofFront:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycUpload'
+        idProofBack:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycUpload'
+        passportProof:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycUpload'
+        permitProof:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycUpload'
+        proofOfResidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycUpload'
+    KycUpload:
+      type: object
+      description: A single KYC document upload record with attribution
+      required:
+        - s3Key
+        - uploadedByApiKeyId
+        - uploadedAt
+      properties:
+        s3Key:
+          type: string
+          description: S3 key path where the document is stored
+        uploadedByApiKeyId:
+          type: string
+          description: API key ID that uploaded this document (read-only, auto-populated)
+        uploadedByTenant:
+          type: string
+          nullable: true
+          description: Tenant identifier (from API key label) that uploaded this document (read-only, auto-populated)
+        uploadedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the document was uploaded
+    KycData:
+      type: object
+      additionalProperties: true
+      properties:
+        productType: { type: string }
+        email: { type: string, format: email }
+        altEmail: { type: string, nullable: true }
+        title: { type: string }
+        name: { type: string }
+        surname: { type: string }
+        dob: { type: string }
+        gender: { type: string }
+        nationality: { type: string }
+        languageIndicator: { type: string }
+        phone: { type: string }
+        altPhone: { type: string }
+        suitableContactTime: { type: string }
+        residenceIndicator: { type: string }
+        residenceCountry: { type: string }
+        identityType: { type: string }
+        idNumber: { type: string }
+        idIssue: { type: string }
+        idExpiry: { type: string, nullable: true }
+        identityIssueCountry: { type: string }
+        idProofFrontFile: { type: string, nullable: true }
+        idProofBackFile: { type: string, nullable: true }
+        passportProofFile: { type: string, nullable: true }
+        permitType: { type: string }
+        permitNumber: { type: string }
+        permitIssue: { type: string }
+        permitExpiry: { type: string }
+        permitProofFile: { type: string, nullable: true }
+        idProofFile: { type: string, nullable: true }
+        pepPip: { type: string }
+        streetNumber: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        suburb: { type: string }
+        city: { type: string }
+        province: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        addressType: { type: string }
+        proofOfResidenceFile: { type: string, nullable: true }
+        residenceStatus: { type: string }
+        samePostal: { type: boolean }
+        postalAddress: { type: string, nullable: true }
+        company: { type: string }
+        employeeId: { type: string }
+        employmentStatus: { type: string }
+        sourceOfFunds: { type: string }
+        intendedPurposeOfAccount: { type: string }
+        tncAccepted: { type: boolean }
+        tncAcceptedAt: { type: string }
+    KycDetails:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Not Started, Pending, Approved, Rejected]
+        rejectionReason: { type: string }
+        kycData: { $ref: '#/components/schemas/KycData' }
+        s3Keys: { $ref: '#/components/schemas/S3Keys' }
+    ScreeningHistoryEntry:
+      type: object
+      properties:
+        status: { type: string }
+        date: { type: string, format: date-time }
+        notes: { type: string }
+        screenedBy: { type: string, nullable: true }
+    ComplianceDetails:
+      type: object
+      properties:
+        screeningStatus:
+          type: string
+          enum: [pending, cleared, flagged, review]
+        screeningDate: { type: string, format: date-time, nullable: true }
+        screeningNotes: { type: string }
+        screenedBy: { type: string, nullable: true }
+        flagReason: { type: string, nullable: true }
+        screeningHistory:
+          type: array
+          items: { $ref: '#/components/schemas/ScreeningHistoryEntry' }
+    CardsDetails:
+      type: object
+      properties:
+        subAccountId: { type: string, nullable: true }
+        label: { type: string, nullable: true }
+        depositAddresses:
+          type: object
+          additionalProperties: { type: string }
+        depositTags:
+          type: object
+          additionalProperties: { type: string }
+        cardIds:
+          type: array
+          items: { type: string }
+        depositAddressesFetchedAt: { type: number }
+    DepositDetail:
+      type: object
+      properties:
+        currency: { type: string }
+        amount: { type: number }
+        address: { type: string }
+        transactionHash: { type: string, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TradeDetail:
+      type: object
+      properties:
+        orderId: { type: string }
+        pair: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        amount: { type: number }
+        price: { type: number }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WithdrawalDetail:
+      type: object
+      properties:
+        valrWithdrawalId: { type: string }
+        currency: { type: string }
+        amount: { type: number }
+        address: { type: string }
+        networkType: { type: string }
+        feeAmount: { type: number }
+        transactionHash: { type: string, nullable: true }
+        confirmations: { type: number }
+        lastConfirmationAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        verified: { type: boolean }
+        status: { type: string, enum: [Pending, Processing, Complete, Failed, Cancelled] }
+        source: { type: string }
+        updatedAt: { type: string, format: date-time }
+    User:
+      type: object
+      properties:
+        _id: { type: string }
+        userDetails: { $ref: '#/components/schemas/UserDetails' }
+        kycDetails: { $ref: '#/components/schemas/KycDetails' }
+        complianceDetails: { $ref: '#/components/schemas/ComplianceDetails' }
+        cardsDetails: { $ref: '#/components/schemas/CardsDetails' }
+        depositDetails:
+          type: array
+          items: { $ref: '#/components/schemas/DepositDetail' }
+        tradeDetails:
+          type: array
+          items: { $ref: '#/components/schemas/TradeDetail' }
+        preferences: { $ref: '#/components/schemas/Preferences' }
+        withdrawalDetails:
+          type: array
+          items: { $ref: '#/components/schemas/WithdrawalDetail' }
+        createdByApiKeyId:
+          type: string
+          description: API key ID that created this user (read-only, auto-populated)
+        createdByTenant:
+          type: string
+          nullable: true
+          description: Tenant identifier (from API key label) that created this user (read-only, auto-populated)
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UserInput:
+      type: object
+      required: [userDetails]
+      properties:
+        userDetails: { $ref: '#/components/schemas/UserDetails' }
+        kycDetails: { $ref: '#/components/schemas/KycDetails' }
+        complianceDetails: { $ref: '#/components/schemas/ComplianceDetails' }
+        cardsDetails: { $ref: '#/components/schemas/CardsDetails' }
+        depositDetails:
+          type: array
+          items: { $ref: '#/components/schemas/DepositDetail' }
+        tradeDetails:
+          type: array
+          items: { $ref: '#/components/schemas/TradeDetail' }
+        preferences: { $ref: '#/components/schemas/Preferences' }
+        withdrawalDetails:
+          type: array
+          items: { $ref: '#/components/schemas/WithdrawalDetail' }
+    TaskFlowPayload:
+      type: object
+      additionalProperties: true
+      properties:
+        spendl_product_type_id: { type: string }
+        email: { type: string, format: email }
+        email_secondary: { type: string }
+        title: { type: string }
+        name: { type: string }
+        surname: { type: string }
+        birth_date: { type: string }
+        gender: { type: string }
+        nationality_id: { type: string }
+        preferred_language_id: { type: string }
+        phone: { type: string }
+        mobile: { type: string }
+        contact_time: { type: string }
+        residence_indicator: { type: string }
+        residence_country_id: { type: string }
+        identity_type: { type: string }
+        id_number: { type: string }
+        id_issue_date: { type: string }
+        id_expiry_date: { type: string }
+        identity_issue_country: { type: string }
+        document_ids_front: { type: string }
+        document_ids_back: { type: string }
+        document_ids_passport: { type: string }
+        permit_type: { type: string }
+        permit_number: { type: string }
+        permit_issue_date: { type: string }
+        permit_expiry_date: { type: string }
+        document_id_permit: { type: string }
+        document_id_proof: { type: string }
+        pep_pip_declaration: { oneOf: [ { type: boolean }, { type: string } ] }
+        street: { type: string }
+        street2: { type: string }
+        street3: { type: string }
+        suburb: { type: string }
+        city_id: { type: string }
+        state_id: { type: string }
+        zip: { type: string }
+        country_id: { type: string }
+        address_type: { type: string }
+        document_id_residence: { type: string }
+        residence_status: { type: string }
+        postal_address: { type: boolean }
+        postal_street_line_1: { type: string }
+        postal_street_line_2: { type: string }
+        postal_street_line_3: { type: string }
+        postal_city_id: { type: string }
+        postal_zip: { type: string }
+        postal_country_id: { type: string }
+        company_type: { type: string }
+        employment_number: { type: string }
+        employment_status: { type: string }
+        spendl_source_of_funds_id: { type: string }
+        spendl_account_purpose: { type: string }
+        accept_terms_and_conditions: { type: string }
+      example:
+        spendl_product_type_id: "SPENDL-001"
+        email: "john.vanderberg@example.com"
+        email_secondary: "john.backup@example.com"
+        title: "Mr"
+        name: "John"
+        surname: "Van Der Berg"
+        birth_date: "1990-01-01"
+        gender: "Male"
+        nationality_id: "ZA"
+        preferred_language_id: "EN"
+        phone: "+27110001234"
+        mobile: "+27821234567"
+        contact_time: "09h00"
+        residence_indicator: "Permanent"
+        residence_country_id: "ZA"
+        identity_type: "RSA ID"
+        id_number: "9001015009087"
+        id_issue_date: "2008-01-15"
+        identity_issue_country: "ZA"
+        pep_pip_declaration: false
+        street: "42 Long Street"
+        street2: "Unit 5"
+        suburb: "Gardens"
+        city_id: "Cape Town"
+        state_id: "Western Cape"
+        zip: "8001"
+        country_id: "ZA"
+        address_type: "Residential"
+        residence_status: "Owner"
+        postal_address: false
+        company_type: "Private Company"
+        employment_number: "EMP001"
+        employment_status: "Employed"
+        spendl_source_of_funds_id: "Salary"
+        spendl_account_purpose: "Savings and Investments"
+        accept_terms_and_conditions: "2026-01-29T10:00:00Z"
+    IngestData:
+      oneOf:
+        - $ref: '#/components/schemas/UserInput'
+        - $ref: '#/components/schemas/TaskFlowPayload'
+    IngestRequest:
+      oneOf:
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/IngestData' }
+          required: [data]
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/IngestData' }
+          required: [data]
+    SingleInsertResult:
+      type: object
+      required: [success, user]
+      properties:
+        success: { type: boolean, enum: [true] }
+        user: { $ref: '#/components/schemas/User' }
+    BatchInsertResult:
+      type: object
+      required: [inserted, insertedCount, failed, failedCount]
+      properties:
+        inserted:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        insertedCount: { type: integer }
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              record: { $ref: '#/components/schemas/UserInput' }
+              email: { type: string }
+              reason: { type: string, enum: [DUPLICATE_EMAIL, VALIDATION_ERROR, UNKNOWN_ERROR] }
+        failedCount: { type: integer }
+    ValidationResponse:
+      type: object
+      required: [valid, errors]
+      properties:
+        valid: { type: boolean }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              email: { type: string }
+              errors:
+                type: array
+                items: { type: string }
+    KycUploadResponse:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean, enum: [true] }
+    DocumentType:
+      type: string
+      enum: [idProofFront, idProofBack, passportProof, permitProof, proofOfResidence]
+      description: |
+        Type of KYC document:
+        - idProofFront: Front of ID card (category: ID)
+        - idProofBack: Back of ID card (category: ID)
+        - passportProof: Passport photo page (category: ID)
+        - permitProof: Work/residence permit (category: ID)
+        - proofOfResidence: Utility bill, bank statement, etc. (category: POR)
+    DocumentCategory:
+      type: string
+      enum: [ID, POR]
+      description: |
+        Document category:
+        - ID: Identity documents (idProofFront, idProofBack, passportProof, permitProof)
+        - POR: Proof of residence (proofOfResidence)
+paths:
+  /auth/token:
+    post:
+      tags: [Auth]
+      summary: Exchange API key/secret for JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Access token response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials or key expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/ingest:
+    post:
+      tags: [Ingestor]
+      summary: Ingest single or batch of users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+            examples:
+              taskFlowSingle:
+                summary: TaskFlow single user payload
+                value:
+                  data:
+                    spendl_product_type_id: "SPENDL-001"
+                    email: "john.vanderberg@example.com"
+                    email_secondary: "john.backup@example.com"
+                    title: "Mr"
+                    name: "John"
+                    surname: "Van Der Berg"
+                    birth_date: "1990-01-01"
+                    gender: "Male"
+                    nationality_id: "ZA"
+                    preferred_language_id: "EN"
+                    phone: "+27110001234"
+                    mobile: "+27821234567"
+                    contact_time: "09h00"
+                    residence_indicator: "Permanent"
+                    residence_country_id: "ZA"
+                    identity_type: "RSA ID"
+                    id_number: "9001015009087"
+                    id_issue_date: "2008-01-15"
+                    identity_issue_country: "ZA"
+                    pep_pip_declaration: false
+                    street: "42 Long Street"
+                    street2: "Unit 5"
+                    suburb: "Gardens"
+                    city_id: "Cape Town"
+                    state_id: "Western Cape"
+                    zip: "8001"
+                    country_id: "ZA"
+                    address_type: "Residential"
+                    residence_status: "Owner"
+                    postal_address: false
+                    company_type: "Private Company"
+                    employment_number: "EMP001"
+                    employment_status: "Employed"
+                    spendl_source_of_funds_id: "Salary"
+                    spendl_account_purpose: "Savings and Investments"
+                    accept_terms_and_conditions: "2026-01-29T10:00:00Z"
+              taskFlowBatch:
+                summary: TaskFlow batch payload (2 users)
+                value:
+                  data:
+                    - spendl_product_type_id: "SPENDL-001"
+                      email: "john.vanderberg@example.com"
+                      title: "Mr"
+                      name: "John"
+                      surname: "Van Der Berg"
+                      birth_date: "1990-01-01"
+                      gender: "Male"
+                      nationality_id: "ZA"
+                      identity_type: "RSA ID"
+                      id_number: "9001015009087"
+                      street: "42 Long Street"
+                      city_id: "Cape Town"
+                      state_id: "Western Cape"
+                      zip: "8001"
+                      country_id: "ZA"
+                      employment_status: "Employed"
+                      accept_terms_and_conditions: "2026-01-29T10:00:00Z"
+                    - spendl_product_type_id: "SPENDL-001"
+                      email: "thandi.nkosi@example.com"
+                      title: "Ms"
+                      name: "Thandi"
+                      surname: "Nkosi"
+                      birth_date: "1992-05-21"
+                      gender: "Female"
+                      nationality_id: "ZA"
+                      identity_type: "RSA ID"
+                      id_number: "9205210098087"
+                      street: "15 Jan Smuts Avenue"
+                      city_id: "Johannesburg"
+                      state_id: "Gauteng"
+                      zip: "2196"
+                      country_id: "ZA"
+                      employment_status: "Self-Employed"
+                      accept_terms_and_conditions: "2026-01-29T11:30:00Z"
+      responses:
+        '200':
+          description: Ingestion result (single or batch)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SingleInsertResult'
+                  - $ref: '#/components/schemas/BatchInsertResult'
+              examples:
+                singleSuccess:
+                  summary: Single TaskFlow user ingestion success
+                  value:
+                    success: true
+                    user:
+                      _id: "507f1f77bcf86cd799439011"
+                      userDetails:
+                        email: "john.vanderberg@example.com"
+                        password: null
+                        emailConfirmation: null
+                        status: "pending"
+                      kycDetails:
+                        status: "Pending"
+                        rejectionReason: ""
+                        kycData:
+                          productType: "SPENDL-001"
+                          email: "john.vanderberg@example.com"
+                          altEmail: "john.backup@example.com"
+                          title: "Mr"
+                          name: "John"
+                          surname: "Van Der Berg"
+                          dob: "1990-01-01"
+                          gender: "Male"
+                          nationality: "ZA"
+                          languageIndicator: "EN"
+                          phone: "+27110001234"
+                          altPhone: "+27821234567"
+                          suitableContactTime: "09h00"
+                          residenceIndicator: "Permanent"
+                          residenceCountry: "ZA"
+                          identityType: "RSA ID"
+                          idNumber: "9001015009087"
+                          idIssue: "2008-01-15"
+                          identityIssueCountry: "ZA"
+                          pepPip: "false"
+                          streetNumber: "42"
+                          addressLine1: "Long Street"
+                          addressLine2: "Unit 5"
+                          suburb: "Gardens"
+                          city: "Cape Town"
+                          province: "Western Cape"
+                          postalCode: "8001"
+                          country: "ZA"
+                          addressType: "Residential"
+                          residenceStatus: "Owner"
+                          samePostal: true
+                          company: "Private Company"
+                          employeeId: "EMP001"
+                          employmentStatus: "Employed"
+                          sourceOfFunds: "Salary"
+                          intendedPurposeOfAccount: "Savings and Investments"
+                          tncAccepted: true
+                          tncAcceptedAt: "2026-01-29T10:00:00Z"
+                      createdByApiKeyId: "id_abc123def456"
+                      createdByTenant: "Partner Corp"
+                      createdAt: "2026-01-29T10:05:00Z"
+                      updatedAt: "2026-01-29T10:05:00Z"
+                batchSuccess:
+                  summary: Batch TaskFlow ingestion success
+                  value:
+                    inserted:
+                      - _id: "507f1f77bcf86cd799439011"
+                        userDetails:
+                          email: "john.vanderberg@example.com"
+                          status: "pending"
+                        kycDetails:
+                          status: "Pending"
+                          kycData:
+                            name: "John"
+                            surname: "Van Der Berg"
+                        createdByApiKeyId: "id_abc123def456"
+                        createdByTenant: "Partner Corp"
+                      - _id: "507f1f77bcf86cd799439012"
+                        userDetails:
+                          email: "thandi.nkosi@example.com"
+                          status: "pending"
+                        kycDetails:
+                          status: "Pending"
+                          kycData:
+                            name: "Thandi"
+                            surname: "Nkosi"
+                        createdByApiKeyId: "id_abc123def456"
+                        createdByTenant: "Partner Corp"
+                    insertedCount: 2
+                    failed: []
+                    failedCount: 0
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Duplicate email (single insert)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/validate:
+    post:
+      tags: [Ingestor]
+      summary: Validate payload(s) without inserting
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/kyc/{userId}/{documentType}/{category}/{filename}:
+    post:
+      tags: [KYC]
+      summary: Upload KYC document for a user
+      description: |
+        Upload a KYC document (ID card, passport, proof of residence, etc.) for an existing user.
+        The file is converted to PDF and stored in S3. The S3 path is saved to the user's record.
+        
+        Category validation:
+        - proofOfResidence requires category "POR"
+        - All other document types require category "ID"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: MongoDB ObjectId of the user
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+        - name: documentType
+          in: path
+          required: true
+          description: Type of document being uploaded
+          schema:
+            $ref: '#/components/schemas/DocumentType'
+        - name: category
+          in: path
+          required: true
+          description: Document category (must match documentType)
+          schema:
+            $ref: '#/components/schemas/DocumentCategory'
+        - name: filename
+          in: path
+          required: true
+          description: Original filename
+          schema:
+            type: string
+            example: "drivers-license.jpg"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    The document file. Supported types:
+                    - image/jpeg
+                    - image/png
+                    - application/pdf
+                    
+                    Maximum size: 10MB
+      responses:
+        '200':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycUploadResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '413':
+          description: File too large (exceeds 10MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validation error (invalid documentType, category mismatch, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
