@@ -18,6 +18,7 @@ tags:
   - name: Auth
   - name: Ingestor
   - name: KYC
+  - name: Debt
 components:
   securitySchemes:
     bearerAuth:
@@ -334,6 +335,10 @@ components:
           type: string
           nullable: true
           description: Tenant identifier (from API key label) that created this user (read-only, auto-populated)
+        clientNo:
+          type: string
+          nullable: true
+          description: External client reference number (from TaskFlow), used to link debt obligations
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     UserInput:
@@ -358,6 +363,7 @@ components:
       type: object
       additionalProperties: true
       properties:
+        client_no: { type: string, description: "External client reference number. Stored as clientNo on the User record and used to link debt obligations." }
         spendl_product_type_id: { type: string }
         email: { type: string, format: email }
         email_secondary: { type: string }
@@ -524,6 +530,180 @@ components:
         Document category:
         - ID: Identity documents (idProofFront, idProofBack, passportProof, permitProof)
         - POR: Proof of residence (proofOfResidence)
+    TaskFlowDebtPayload:
+      type: object
+      required: [guid, machine, client_no, loan_ref_no, first_dt, date_adj, frequency, track_cd, total_amt, inst_amt, status, account_type, bank_acc_no, bank_branch_cd, pmt_stream, allow_tracking, allow_date_chg, allow_max_inst, allow_any_cell_no, allow_scheduling, mode, wait_response, api_callback]
+      properties:
+        guid: { type: string, description: Unique identifier for the debt obligation }
+        machine: { type: string, description: Originating machine identifier }
+        client_no: { type: string, description: Client reference number (must match an existing user's clientNo) }
+        loan_ref_no: { type: string, description: Loan reference number }
+        first_dt: { type: string, description: "First payment date in YYYYMMDD format" }
+        date_adj: { type: integer, description: Date adjustment value }
+        frequency: { type: integer, description: Payment frequency code }
+        track_cd: { type: string, description: Tracking code }
+        total_amt: { type: integer, description: Total amount in cents }
+        inst_amt: { type: integer, description: Instalment amount in cents }
+        status: { type: string, description: Obligation status }
+        account_type: { type: integer, description: Bank account type }
+        bank_acc_no: { type: string, description: Bank account number }
+        bank_branch_cd: { type: string, description: Bank branch code }
+        pmt_stream: { type: string, description: Payment stream identifier }
+        inst_adj_amt: { type: integer, description: Instalment adjustment amount, default: 0 }
+        inst_adj_rate: { type: integer, description: Instalment adjustment rate, default: 0 }
+        allow_tracking: { type: string, enum: ["T", "F"], description: Allow tracking flag }
+        allow_date_chg: { type: string, enum: ["T", "F"], description: Allow date change flag }
+        allow_max_inst: { type: string, enum: ["T", "F"], description: Allow max instalment flag }
+        allow_any_cell_no: { type: string, enum: ["T", "F"], description: Allow any cell number flag }
+        allow_scheduling: { type: string, enum: ["T", "F"], description: Allow scheduling flag }
+        mode: { type: string, description: Processing mode (e.g. Realtime) }
+        wait_response: { type: string, enum: ["T", "F"], description: Wait for response flag }
+        api_callback: { type: string, format: uri, description: "HTTPS callback URL. The hostname must be in the configured callback allowlist (TASKFLOW_CALLBACK_ALLOWLIST); non-allowlisted hosts are rejected with HTTP 422." }
+      example:
+        guid: "7D9B408607114EA288FD0F5CD629EB6F"
+        machine: "WINDOWS-PC"
+        client_no: "00000000240247"
+        loan_ref_no: "176412_92129"
+        first_dt: "20260331"
+        date_adj: 4
+        frequency: 2
+        track_cd: "03"
+        total_amt: 1302332
+        inst_amt: 15000
+        status: "0"
+        account_type: 0
+        bank_acc_no: "2055177865"
+        bank_branch_cd: "470010"
+        pmt_stream: "ACOL"
+        inst_adj_amt: 0
+        inst_adj_rate: 0
+        allow_tracking: "T"
+        allow_date_chg: "T"
+        allow_max_inst: "F"
+        allow_any_cell_no: "T"
+        allow_scheduling: "T"
+        mode: "Realtime"
+        wait_response: "F"
+        api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+    DebtObligationRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskFlowDebtPayload'
+    DebtObligation:
+      type: object
+      properties:
+        _id: { type: string }
+        guid: { type: string }
+        machine: { type: string }
+        clientNo: { type: string }
+        loanRefNo: { type: string }
+        firstDt: { type: string }
+        dateAdj: { type: integer }
+        frequency: { type: integer }
+        trackCd: { type: string }
+        totalAmt: { type: integer }
+        instAmt: { type: integer }
+        status: { type: string }
+        accountType: { type: integer }
+        bankAccNo: { type: string }
+        bankBranchCd: { type: string }
+        pmtStream: { type: string }
+        instAdjAmt: { type: integer }
+        instAdjRate: { type: integer }
+        allowTracking: { type: boolean }
+        allowDateChg: { type: boolean }
+        allowMaxInst: { type: boolean }
+        allowAnyCellNo: { type: boolean }
+        allowScheduling: { type: boolean }
+        mode: { type: string }
+        waitResponse: { type: boolean }
+        apiCallback: { type: string }
+        userId: { type: string, description: MongoDB ObjectId of the linked user }
+        processingStatus:
+          type: string
+          enum: [pending, forwarded, callback_sent, callback_failed, failed]
+          description: Current processing state of the obligation
+        replyCd: { type: string, nullable: true, description: Reply code from processing }
+        replyStr: { type: string, nullable: true, description: Reply message from processing }
+        backendResponse: { type: object, nullable: true, description: Raw response from Spendl backend }
+        errorMessage: { type: string, nullable: true }
+        callbackSentAt: { type: string, format: date-time, nullable: true }
+        createdByApiKeyId: { type: string }
+        createdByTenant: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DebtIngestResponse:
+      type: object
+      required: [success, obligation]
+      properties:
+        success: { type: boolean, enum: [true] }
+        obligation: { $ref: '#/components/schemas/DebtObligation' }
+    DebtStatusResponse:
+      type: object
+      required: [obligation]
+      properties:
+        obligation: { $ref: '#/components/schemas/DebtObligation' }
+    TaskFlowDebtCallback:
+      type: object
+      description: Callback payload sent to TaskFlow's api_callback URL after processing
+      properties:
+        guid: { type: string }
+        machine: { type: string }
+        client_no: { type: string }
+        loan_ref_no: { type: string }
+        first_dt: { type: string }
+        date_adj: { type: integer }
+        frequency: { type: integer }
+        track_cd: { type: string }
+        total_amt: { type: integer }
+        inst_amt: { type: integer }
+        status: { type: string }
+        account_type: { type: integer }
+        bank_acc_no: { type: string }
+        bank_branch_cd: { type: string }
+        pmt_stream: { type: string }
+        inst_adj_amt: { type: integer }
+        inst_adj_rate: { type: integer }
+        allow_tracking: { type: string }
+        allow_date_chg: { type: string }
+        allow_max_inst: { type: string }
+        allow_any_cell_no: { type: string }
+        allow_scheduling: { type: string }
+        mode: { type: string }
+        wait_response: { type: string }
+        api_callback: { type: string }
+        reply_cd: { type: string, description: Reply code (e.g. 207 for success) }
+        reply_str: { type: string, description: Reply message (e.g. Successful) }
+      example:
+        guid: "7D9B408607114EA288FD0F5CD629EB6F"
+        machine: "WINDOWS-PC"
+        client_no: "9011290136082"
+        loan_ref_no: "171407_92133"
+        first_dt: "20260227"
+        date_adj: 4
+        frequency: 2
+        track_cd: "05"
+        total_amt: 1833812
+        inst_amt: 50000
+        status: "0"
+        account_type: 1
+        bank_acc_no: "19781693377"
+        bank_branch_cd: "679000"
+        pmt_stream: "ACOL"
+        inst_adj_amt: 0
+        inst_adj_rate: 0
+        allow_tracking: "T"
+        allow_date_chg: "T"
+        allow_max_inst: "F"
+        allow_any_cell_no: "T"
+        allow_scheduling: "T"
+        mode: "Realtime"
+        wait_response: "F"
+        api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+        reply_cd: "207"
+        reply_str: "Successful"
 paths:
   /auth/token:
     post:
@@ -891,6 +1071,213 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/debt/ingest:
+    post:
+      tags: [Debt]
+      description: |
+        Accepts a debt obligation payload from TaskFlow, resolves the client_no to an existing user,
+        persists the record, forwards it to the Spendl backend, and sends a callback to TaskFlow's
+        api_callback URL. Processing is synchronous.
+        
+        Flow: validate → dedup check (guid) → lookup user (client_no) → persist → forward to Spendl backend → callback to TaskFlow → respond
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DebtObligationRequest'
+            examples:
+              debtObligation:
+                summary: TaskFlow debt obligation payload
+                value:
+                  data:
+                    guid: "7D9B408607114EA288FD0F5CD629EB6F"
+                    machine: "WINDOWS-PC"
+                    client_no: "00000000240247"
+                    loan_ref_no: "176412_92129"
+                    first_dt: "20260331"
+                    date_adj: 4
+                    frequency: 2
+                    track_cd: "03"
+                    total_amt: 1302332
+                    inst_amt: 15000
+                    status: "0"
+                    account_type: 0
+                    bank_acc_no: "2055177865"
+                    bank_branch_cd: "470010"
+                    pmt_stream: "ACOL"
+                    inst_adj_amt: 0
+                    inst_adj_rate: 0
+                    allow_tracking: "T"
+                    allow_date_chg: "T"
+                    allow_max_inst: "F"
+                    allow_any_cell_no: "T"
+                    allow_scheduling: "T"
+                    mode: "Realtime"
+                    wait_response: "F"
+                    api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+      responses:
+        '200':
+          description: Debt obligation successfully processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebtIngestResponse'
+              examples:
+                success:
+                  summary: Successful debt obligation ingestion
+                  value:
+                    success: true
+                    obligation:
+                      _id: "507f1f77bcf86cd799439011"
+                      guid: "7D9B408607114EA288FD0F5CD629EB6F"
+                      clientNo: "00000000240247"
+                      loanRefNo: "176412_92129"
+                      firstDt: "20260331"
+                      totalAmt: 1302332
+                      instAmt: 15000
+                      processingStatus: "callback_sent"
+                      replyCd: "207"
+                      replyStr: "Successful"
+                      userId: "507f1f77bcf86cd799439022"
+                      createdByApiKeyId: "id_abc123def456"
+                      createdByTenant: "Partner Corp"
+                      createdAt: "2026-02-24T10:00:00Z"
+                      updatedAt: "2026-02-24T10:00:01Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: User not found (no user with matching client_no)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                userNotFound:
+                  value:
+                    error:
+                      message: "No user found with clientNo '00000000240247'"
+                      code: 404
+                      type: "USER_NOT_FOUND"
+        '409':
+          description: Duplicate guid (obligation already processed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                duplicateGuid:
+                  value:
+                    error:
+                      message: "Debt obligation with guid '7D9B408607114EA288FD0F5CD629EB6F' already exists"
+                      code: 409
+                      type: "DUPLICATE_GUID"
+        '422':
+          description: Validation error (missing required fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                missingFields:
+                  value:
+                    error:
+                      message: "Missing required fields: guid, client_no"
+                      code: 422
+                      type: "VALIDATION_ERROR"
+        '502':
+          description: Backend or callback error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                backendError:
+                  value:
+                    error:
+                      message: "Failed to forward debt obligation to backend: Connection refused"
+                      code: 502
+                      type: "BACKEND_FORWARD_ERROR"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/debt/status/{guid}:
+    get:
+      tags: [Debt]
+      summary: Get debt obligation status by guid
+      description: |
+        Retrieve the current status and full details of a debt obligation by its guid.
+        Useful for checking processing status after ingestion.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          description: Unique identifier of the debt obligation
+          schema:
+            type: string
+            example: "7D9B408607114EA288FD0F5CD629EB6F"
+      responses:
+        '200':
+          description: Debt obligation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebtStatusResponse'
+              examples:
+                found:
+                  summary: Debt obligation status
+                  value:
+                    obligation:
+                      _id: "507f1f77bcf86cd799439011"
+                      guid: "7D9B408607114EA288FD0F5CD629EB6F"
+                      clientNo: "00000000240247"
+                      loanRefNo: "176412_92129"
+                      firstDt: "20260331"
+                      totalAmt: 1302332
+                      instAmt: 15000
+                      processingStatus: "callback_sent"
+                      replyCd: "207"
+                      replyStr: "Successful"
+                      userId: "507f1f77bcf86cd799439022"
+                      callbackSentAt: "2026-02-24T10:00:01Z"
+                      createdAt: "2026-02-24T10:00:00Z"
+                      updatedAt: "2026-02-24T10:00:01Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Obligation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                notFound:
+                  value:
+                    error:
+                      message: "Debt obligation with guid '7D9B408607114EA288FD0F5CD629EB6F' not found"
+                      code: 404
+                      type: "OBLIGATION_NOT_FOUND"
         '500':
           description: Server error
           content:

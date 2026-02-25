@@ -286,6 +286,72 @@
       ]
     },
     {
+      "name": "Debt (Protected)",
+      "item": [
+        {
+          "name": "Ingest Debt Obligation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/debt/ingest", "host": ["{{baseUrl}}"], "path": ["api", "debt", "ingest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"guid\": \"7D9B408607114EA288FD0F5CD629EB6F\",\n    \"machine\": \"WINDOWS-PC\",\n    \"client_no\": \"00000000240247\",\n    \"loan_ref_no\": \"176412_92129\",\n    \"first_dt\": \"20260331\",\n    \"date_adj\": 4,\n    \"frequency\": 2,\n    \"track_cd\": \"03\",\n    \"total_amt\": 1302332,\n    \"inst_amt\": 15000,\n    \"status\": \"0\",\n    \"account_type\": 0,\n    \"bank_acc_no\": \"2055177865\",\n    \"bank_branch_cd\": \"470010\",\n    \"pmt_stream\": \"ACOL\",\n    \"inst_adj_amt\": 0,\n    \"inst_adj_rate\": 0,\n    \"allow_tracking\": \"T\",\n    \"allow_date_chg\": \"T\",\n    \"allow_max_inst\": \"F\",\n    \"allow_any_cell_no\": \"T\",\n    \"allow_scheduling\": \"T\",\n    \"mode\": \"Realtime\",\n    \"wait_response\": \"F\",\n    \"api_callback\": \"https://bridge.taskflow.co.za/amplifin/response\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('success is true', () => pm.expect(json.success).to.eql(true));",
+                  "pm.test('obligation object present', () => pm.expect(json.obligation).to.be.an('object'));",
+                  "pm.test('processingStatus is callback_sent', () => pm.expect(json.obligation.processingStatus).to.eql('callback_sent'));",
+                  "pm.test('guid matches', () => pm.expect(json.obligation.guid).to.eql('7D9B408607114EA288FD0F5CD629EB6F'));",
+                  "if (json.obligation) { pm.environment.set('lastDebtGuid', json.obligation.guid); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Debt Obligation Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/debt/status/{{lastDebtGuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "debt", "status", "{{lastDebtGuid}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('obligation object present', () => pm.expect(json.obligation).to.be.an('object'));",
+                  "pm.test('guid is present', () => pm.expect(json.obligation.guid).to.be.a('string'));",
+                  "pm.test('processingStatus is present', () => pm.expect(json.obligation.processingStatus).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "KYC (Protected)",
       "item": [
         {

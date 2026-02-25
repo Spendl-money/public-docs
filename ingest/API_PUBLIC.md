@@ -290,6 +290,157 @@ Or if invalid:
 
 ---
 
+## Step 5: Ingest Debt Obligations
+
+Submit debt obligation data from TaskFlow. Igor will persist the record, forward it to the Spendl backend, and send a callback to the provided `api_callback` URL.
+
+> **Prerequisite**: The `client_no` in the debt payload must match an existing user's `clientNo` field. Users must be ingested first (Step 2) with a `client_no` in the TaskFlow payload.
+
+### Request
+```
+POST /api/debt/ingest
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+### Payload
+```json
+{
+  "data": {
+    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+    "machine": "WINDOWS-PC",
+    "client_no": "00000000240247",
+    "loan_ref_no": "176412_92129",
+    "first_dt": "20260331",
+    "date_adj": 4,
+    "frequency": 2,
+    "track_cd": "03",
+    "total_amt": 1302332,
+    "inst_amt": 15000,
+    "status": "0",
+    "account_type": 0,
+    "bank_acc_no": "2055177865",
+    "bank_branch_cd": "470010",
+    "pmt_stream": "ACOL",
+    "inst_adj_amt": 0,
+    "inst_adj_rate": 0,
+    "allow_tracking": "T",
+    "allow_date_chg": "T",
+    "allow_max_inst": "F",
+    "allow_any_cell_no": "T",
+    "allow_scheduling": "T",
+    "mode": "Realtime",
+    "wait_response": "F",
+    "api_callback": "https://bridge.taskflow.co.za/amplifin/response"
+  }
+}
+```
+
+### Required Fields
+| Field | Type | Description |
+|-------|------|-------------|
+| guid | string | Unique identifier for the obligation (prevents duplicates) |
+| machine | string | Originating machine identifier |
+| client_no | string | Client reference — must match an existing user |
+| loan_ref_no | string | Loan reference number |
+| first_dt | string | First payment date (YYYYMMDD) |
+| date_adj | integer | Date adjustment value |
+| frequency | integer | Payment frequency code |
+| track_cd | string | Tracking code |
+| total_amt | integer | Total repayment amount in cents |
+| inst_amt | integer | Instalment amount in cents |
+| status | string | Obligation status |
+| account_type | integer | Bank account type |
+| bank_acc_no | string | Bank account number |
+| bank_branch_cd | string | Bank branch code |
+| pmt_stream | string | Payment stream identifier |
+| allow_tracking | string | Whether tracking is allowed (`T` or `F`) |
+| allow_date_chg | string | Whether date changes are allowed (`T` or `F`) |
+| allow_max_inst | string | Whether maximum instalment changes are allowed (`T` or `F`) |
+| allow_any_cell_no | string | Whether any cellphone number may be used (`T` or `F`) |
+| allow_scheduling | string | Whether scheduling is allowed (`T` or `F`) |
+| mode | string | Processing mode (for example `Realtime`) |
+| wait_response | string | Whether to wait for synchronous response (`T` or `F`) |
+| api_callback | string | HTTPS callback URL where the processing result will be sent. The host must be on the server-side allowlist; non-HTTPS URLs or non-allowlisted hosts are rejected with HTTP 422. |
+
+### Response (Success)
+```json
+{
+  "success": true,
+  "obligation": {
+    "_id": "507f1f77bcf86cd799439011",
+    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+    "clientNo": "00000000240247",
+    "loanRefNo": "176412_92129",
+    "processingStatus": "callback_sent",
+    "replyCd": "207",
+    "replyStr": "Successful",
+    "createdAt": "2026-02-24T10:00:00Z"
+  }
+}
+```
+
+### Callback
+After processing, a POST is sent to your `api_callback` URL with the original data plus result fields:
+```json
+{
+  "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+  "machine": "WINDOWS-PC",
+  "client_no": "9011290136082",
+  "loan_ref_no": "171407_92133",
+  "reply_cd": "207",
+  "reply_str": "Successful"
+}
+```
+
+### Error Responses
+| Code | Type | Description |
+|------|------|-------------|
+| 401 | `INVALID_TOKEN` | Invalid or missing authentication token |
+| 404 | `USER_NOT_FOUND` | No user found with matching `client_no` |
+| 409 | `DUPLICATE_GUID` | Debt obligation with this guid already exists |
+| 422 | `VALIDATION_ERROR` | Missing required fields |
+| 502 | `BACKEND_FORWARD_ERROR` | Failed to forward to Spendl backend |
+| 502 | `CALLBACK_ERROR` | Failed to send callback to `api_callback` URL |
+
+---
+
+## Step 6: Check Debt Obligation Status
+
+Check the processing status of a previously submitted debt obligation.
+
+### Request
+```
+GET /api/debt/status/:guid
+Authorization: Bearer <accessToken>
+```
+
+### Response
+```json
+{
+  "obligation": {
+    "_id": "507f1f77bcf86cd799439011",
+    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+    "clientNo": "00000000240247",
+    "processingStatus": "callback_sent",
+    "replyCd": "207",
+    "replyStr": "Successful",
+    "callbackSentAt": "2026-02-24T10:00:01Z"
+  }
+}
+```
+
+### Processing Statuses
+| Status | Description |
+|--------|-------------|
+| `pending` | Obligation received and persisted, not yet forwarded |
+| `forwarded` | Successfully forwarded to Spendl backend |
+| `callback_sent` | Callback sent to TaskFlow — fully complete |
+| `callback_failed` | Forwarding to Spendl backend succeeded, but the TaskFlow callback failed — obligation processing is complete, notification is not |
+| `failed` | Processing failed (see `errorMessage` for details) |
+
+---
+
 ## API Request Headers
 
 All requests must include:
@@ -311,6 +462,7 @@ Authorization: Bearer <accessToken>
 |-------|------|-------|
 | createdByApiKeyId | string | API key that created the user (auto-populated) |
 | createdByTenant | string | null | Organization name from API key label (auto-populated) |
+| clientNo | string | null | External client reference (set from TaskFlow `client_no`, used for debt obligation lookup) |
 
 ### Core User Fields
 | Field | Type | Required | Notes |
@@ -368,6 +520,48 @@ curl -X POST "https://ingest.spendl.money/api/ingest" \
   }'
 ```
 
+### cURL — Ingest Debt Obligation
+```bash
+curl -X POST "https://ingest.spendl.money/api/debt/ingest" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "data": {
+      "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+      "machine": "WINDOWS-PC",
+      "client_no": "00000000240247",
+      "loan_ref_no": "176412_92129",
+      "first_dt": "20260331",
+      "date_adj": 4,
+      "frequency": 2,
+      "track_cd": "03",
+      "total_amt": 1302332,
+      "inst_amt": 15000,
+      "status": "0",
+      "account_type": 0,
+      "bank_acc_no": "2055177865",
+      "bank_branch_cd": "470010",
+      "pmt_stream": "ACOL",
+      "inst_adj_amt": 0,
+      "inst_adj_rate": 0,
+      "allow_tracking": "T",
+      "allow_date_chg": "T",
+      "allow_max_inst": "F",
+      "allow_any_cell_no": "T",
+      "allow_scheduling": "T",
+      "mode": "Realtime",
+      "wait_response": "F",
+      "api_callback": "https://bridge.taskflow.co.za/amplifin/response"
+    }
+  }'
+```
+
+### cURL — Check Debt Status
+```bash
+curl -X GET "https://ingest.spendl.money/api/debt/status/7D9B408607114EA288FD0F5CD629EB6F" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ### cURL — Batch Upload
 ```bash
 curl -X POST "https://ingest.spendl.money/api/ingest" \
@@ -401,4 +595,4 @@ For questions or technical issues, contact your Spendl integration partner.
 
 ---
 
-**Last Updated:** January 2026 — Added tenant and API key attribution for users and KYC uploads
+**Last Updated:** February 2026 — Added debt obligation ingestion from TaskFlow (Steps 5 & 6)
