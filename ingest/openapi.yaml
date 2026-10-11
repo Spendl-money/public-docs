@@ -338,7 +338,7 @@ components:
         clientNo:
           type: string
           nullable: true
-          description: External client reference number (from TaskFlow), used to link debt obligations
+          description: External client reference number, used to link debt obligations
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     UserInput:
@@ -359,7 +359,7 @@ components:
         withdrawalDetails:
           type: array
           items: { $ref: '#/components/schemas/WithdrawalDetail' }
-    TaskFlowPayload:
+    FlatUserPayload:
       type: object
       additionalProperties: true
       properties:
@@ -458,7 +458,7 @@ components:
     IngestData:
       oneOf:
         - $ref: '#/components/schemas/UserInput'
-        - $ref: '#/components/schemas/TaskFlowPayload'
+        - $ref: '#/components/schemas/FlatUserPayload'
     IngestRequest:
       oneOf:
         - type: object
@@ -530,7 +530,7 @@ components:
         Document category:
         - ID: Identity documents (idProofFront, idProofBack, passportProof, permitProof)
         - POR: Proof of residence (proofOfResidence)
-    TaskFlowDebtPayload:
+    DebtObligationPayload:
       type: object
       required: [guid, machine, client_no, loan_ref_no, first_dt, date_adj, frequency, track_cd, total_amt, inst_amt, status, account_type, bank_acc_no, bank_branch_cd, pmt_stream, allow_tracking, allow_date_chg, allow_max_inst, allow_any_cell_no, allow_scheduling, mode, wait_response, api_callback]
       properties:
@@ -558,21 +558,21 @@ components:
         allow_scheduling: { type: string, enum: ["T", "F"], description: Allow scheduling flag }
         mode: { type: string, description: Processing mode (e.g. Realtime) }
         wait_response: { type: string, enum: ["T", "F"], description: Wait for response flag }
-        api_callback: { type: string, format: uri, description: "HTTPS callback URL. The hostname must be in the configured callback allowlist (TASKFLOW_CALLBACK_ALLOWLIST); non-allowlisted hosts are rejected with HTTP 422." }
+        api_callback: { type: string, format: uri, description: "HTTPS callback URL. The hostname must be in Spendl's callback allowlist; non-allowlisted hosts are rejected with HTTP 422." }
       example:
-        guid: "7D9B408607114EA288FD0F5CD629EB6F"
+        guid: "0123456789ABCDEF0123456789ABCDEF"
         machine: "WINDOWS-PC"
-        client_no: "00000000240247"
-        loan_ref_no: "176412_92129"
+        client_no: "00000000123456"
+        loan_ref_no: "123456_12345"
         first_dt: "20260331"
         date_adj: 4
         frequency: 2
         track_cd: "03"
-        total_amt: 1302332
-        inst_amt: 15000
+        total_amt: 1800000
+        inst_amt: 150000
         status: "0"
         account_type: 0
-        bank_acc_no: "2055177865"
+        bank_acc_no: "1234567890"
         bank_branch_cd: "470010"
         pmt_stream: "ACOL"
         inst_adj_amt: 0
@@ -584,13 +584,13 @@ components:
         allow_scheduling: "T"
         mode: "Realtime"
         wait_response: "F"
-        api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+        api_callback: "https://partner.example.com/debt/response"
     DebtObligationRequest:
       type: object
       required: [data]
       properties:
         data:
-          $ref: '#/components/schemas/TaskFlowDebtPayload'
+          $ref: '#/components/schemas/DebtObligationPayload'
     DebtObligation:
       type: object
       properties:
@@ -645,9 +645,9 @@ components:
       required: [obligation]
       properties:
         obligation: { $ref: '#/components/schemas/DebtObligation' }
-    TaskFlowDebtCallback:
+    DebtObligationCallback:
       type: object
-      description: Callback payload sent to TaskFlow's api_callback URL after processing
+      description: Callback payload sent to the api_callback URL after processing
       properties:
         guid: { type: string }
         machine: { type: string }
@@ -677,20 +677,20 @@ components:
         reply_cd: { type: string, description: Reply code (e.g. 207 for success) }
         reply_str: { type: string, description: Reply message (e.g. Successful) }
       example:
-        guid: "7D9B408607114EA288FD0F5CD629EB6F"
+        guid: "0123456789ABCDEF0123456789ABCDEF"
         machine: "WINDOWS-PC"
-        client_no: "9011290136082"
-        loan_ref_no: "171407_92133"
-        first_dt: "20260227"
+        client_no: "00000000123456"
+        loan_ref_no: "123456_12345"
+        first_dt: "20260331"
         date_adj: 4
         frequency: 2
-        track_cd: "05"
-        total_amt: 1833812
-        inst_amt: 50000
+        track_cd: "03"
+        total_amt: 1800000
+        inst_amt: 150000
         status: "0"
-        account_type: 1
-        bank_acc_no: "19781693377"
-        bank_branch_cd: "679000"
+        account_type: 0
+        bank_acc_no: "1234567890"
+        bank_branch_cd: "470010"
         pmt_stream: "ACOL"
         inst_adj_amt: 0
         inst_adj_rate: 0
@@ -701,7 +701,7 @@ components:
         allow_scheduling: "T"
         mode: "Realtime"
         wait_response: "F"
-        api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+        api_callback: "https://partner.example.com/debt/response"
         reply_cd: "207"
         reply_str: "Successful"
 paths:
@@ -747,8 +747,8 @@ paths:
             schema:
               $ref: '#/components/schemas/IngestRequest'
             examples:
-              taskFlowSingle:
-                summary: TaskFlow single user payload
+              flatSingle:
+                summary: Flat-format single user payload
                 value:
                   data:
                     spendl_product_type_id: "SPENDL-001"
@@ -787,8 +787,8 @@ paths:
                     spendl_source_of_funds_id: "Salary"
                     spendl_account_purpose: "Savings and Investments"
                     accept_terms_and_conditions: "2026-01-29T10:00:00Z"
-              taskFlowBatch:
-                summary: TaskFlow batch payload (2 users)
+              flatBatch:
+                summary: Flat-format batch payload (2 users)
                 value:
                   data:
                     - spendl_product_type_id: "SPENDL-001"
@@ -836,7 +836,7 @@ paths:
                   - $ref: '#/components/schemas/BatchInsertResult'
               examples:
                 singleSuccess:
-                  summary: Single TaskFlow user ingestion success
+                  summary: Single flat-format user ingestion success
                   value:
                     success: true
                     user:
@@ -893,7 +893,7 @@ paths:
                       createdAt: "2026-01-29T10:05:00Z"
                       updatedAt: "2026-01-29T10:05:00Z"
                 batchSuccess:
-                  summary: Batch TaskFlow ingestion success
+                  summary: Batch flat-format ingestion success
                   value:
                     inserted:
                       - _id: "507f1f77bcf86cd799439011"
@@ -1081,11 +1081,11 @@ paths:
     post:
       tags: [Debt]
       description: |
-        Accepts a debt obligation payload from TaskFlow, resolves the client_no to an existing user,
-        persists the record, forwards it to the Spendl backend, and sends a callback to TaskFlow's
+        Accepts a debt obligation payload, resolves the client_no to an existing user,
+        persists the record, forwards it to the Spendl backend, and sends a callback to the
         api_callback URL. Processing is synchronous.
         
-        Flow: validate → dedup check (guid) → lookup user (client_no) → persist → forward to Spendl backend → callback to TaskFlow → respond
+        Flow: validate → dedup check (guid) → lookup user (client_no) → persist → forward to Spendl backend → callback to api_callback → respond
       security:
         - bearerAuth: []
       requestBody:
@@ -1096,22 +1096,22 @@ paths:
               $ref: '#/components/schemas/DebtObligationRequest'
             examples:
               debtObligation:
-                summary: TaskFlow debt obligation payload
+                summary: Debt obligation payload
                 value:
                   data:
-                    guid: "7D9B408607114EA288FD0F5CD629EB6F"
+                    guid: "0123456789ABCDEF0123456789ABCDEF"
                     machine: "WINDOWS-PC"
-                    client_no: "00000000240247"
-                    loan_ref_no: "176412_92129"
+                    client_no: "00000000123456"
+                    loan_ref_no: "123456_12345"
                     first_dt: "20260331"
                     date_adj: 4
                     frequency: 2
                     track_cd: "03"
-                    total_amt: 1302332
-                    inst_amt: 15000
+                    total_amt: 1800000
+                    inst_amt: 150000
                     status: "0"
                     account_type: 0
-                    bank_acc_no: "2055177865"
+                    bank_acc_no: "1234567890"
                     bank_branch_cd: "470010"
                     pmt_stream: "ACOL"
                     inst_adj_amt: 0
@@ -1123,7 +1123,7 @@ paths:
                     allow_scheduling: "T"
                     mode: "Realtime"
                     wait_response: "F"
-                    api_callback: "https://bridge.taskflow.co.za/amplifin/response"
+                    api_callback: "https://partner.example.com/debt/response"
       responses:
         '200':
           description: Debt obligation successfully processed
@@ -1138,12 +1138,12 @@ paths:
                     success: true
                     obligation:
                       _id: "507f1f77bcf86cd799439011"
-                      guid: "7D9B408607114EA288FD0F5CD629EB6F"
-                      clientNo: "00000000240247"
-                      loanRefNo: "176412_92129"
+                      guid: "0123456789ABCDEF0123456789ABCDEF"
+                      clientNo: "00000000123456"
+                      loanRefNo: "123456_12345"
                       firstDt: "20260331"
-                      totalAmt: 1302332
-                      instAmt: 15000
+                      totalAmt: 1800000
+                      instAmt: 150000
                       processingStatus: "callback_sent"
                       replyCd: "207"
                       replyStr: "Successful"
@@ -1168,7 +1168,7 @@ paths:
                 userNotFound:
                   value:
                     error:
-                      message: "No user found with clientNo '00000000240247'"
+                      message: "No user found with clientNo '00000000123456'"
                       code: 404
                       type: "USER_NOT_FOUND"
         '409':
@@ -1181,7 +1181,7 @@ paths:
                 duplicateGuid:
                   value:
                     error:
-                      message: "Debt obligation with guid '7D9B408607114EA288FD0F5CD629EB6F' already exists"
+                      message: "Debt obligation with guid '0123456789ABCDEF0123456789ABCDEF' already exists"
                       code: 409
                       type: "DUPLICATE_GUID"
         '422':
@@ -1232,7 +1232,7 @@ paths:
           description: Unique identifier of the debt obligation
           schema:
             type: string
-            example: "7D9B408607114EA288FD0F5CD629EB6F"
+            example: "0123456789ABCDEF0123456789ABCDEF"
       responses:
         '200':
           description: Debt obligation found
@@ -1246,12 +1246,12 @@ paths:
                   value:
                     obligation:
                       _id: "507f1f77bcf86cd799439011"
-                      guid: "7D9B408607114EA288FD0F5CD629EB6F"
-                      clientNo: "00000000240247"
-                      loanRefNo: "176412_92129"
+                      guid: "0123456789ABCDEF0123456789ABCDEF"
+                      clientNo: "00000000123456"
+                      loanRefNo: "123456_12345"
                       firstDt: "20260331"
-                      totalAmt: 1302332
-                      instAmt: 15000
+                      totalAmt: 1800000
+                      instAmt: 150000
                       processingStatus: "callback_sent"
                       replyCd: "207"
                       replyStr: "Successful"
@@ -1275,7 +1275,7 @@ paths:
                 notFound:
                   value:
                     error:
-                      message: "Debt obligation with guid '7D9B408607114EA288FD0F5CD629EB6F' not found"
+                      message: "Debt obligation with guid '0123456789ABCDEF0123456789ABCDEF' not found"
                       code: 404
                       type: "OBLIGATION_NOT_FOUND"
         '500':
