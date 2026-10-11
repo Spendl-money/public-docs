@@ -123,7 +123,7 @@
           ]
         },
         {
-          "name": "Ingest (TaskFlow payload)",
+          "name": "Ingest (flat-format payload)",
           "request": {
             "method": "POST",
             "header": [
@@ -133,7 +133,7 @@
             "url": { "raw": "{{baseUrl}}/api/ingest", "host": ["{{baseUrl}}"], "path": ["api", "ingest"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"spendl_product_type_id\": \"SPENDL-001\",\n    \"email\": \"postman+{{timestamp}}taskflow@example.com\",\n    \"email_secondary\": \"john.backup+{{timestamp}}@example.com\",\n    \"title\": \"Mr\",\n    \"name\": \"John\",\n    \"surname\": \"Van Der Berg\",\n    \"birth_date\": \"1990-01-01\",\n    \"gender\": \"Male\",\n    \"nationality_id\": \"ZA\",\n    \"preferred_language_id\": \"EN\",\n    \"phone\": \"+27110001234\",\n    \"mobile\": \"+27821234567\",\n    \"contact_time\": \"09h00\",\n    \"residence_indicator\": \"Permanent\",\n    \"residence_country_id\": \"ZA\",\n    \"identity_type\": \"RSA ID\",\n    \"id_number\": \"9001015009087\",\n    \"id_issue_date\": \"2008-01-15\",\n    \"identity_issue_country\": \"ZA\",\n    \"pep_pip_declaration\": false,\n    \"street\": \"42 Long Street\",\n    \"street2\": \"Unit 5\",\n    \"suburb\": \"Gardens\",\n    \"city_id\": \"Cape Town\",\n    \"state_id\": \"Western Cape\",\n    \"zip\": \"8001\",\n    \"country_id\": \"ZA\",\n    \"address_type\": \"Residential\",\n    \"residence_status\": \"Owner\",\n    \"postal_address\": false,\n    \"company_type\": \"Private Company\",\n    \"employment_number\": \"EMP001\",\n    \"employment_status\": \"Employed\",\n    \"spendl_source_of_funds_id\": \"Salary\",\n    \"spendl_account_purpose\": \"Savings and Investments\",\n    \"accept_terms_and_conditions\": \"2026-01-29T10:00:00Z\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"spendl_product_type_id\": \"SPENDL-001\",\n    \"email\": \"postman+{{timestamp}}flat@example.com\",\n    \"email_secondary\": \"john.backup+{{timestamp}}@example.com\",\n    \"title\": \"Mr\",\n    \"name\": \"John\",\n    \"surname\": \"Van Der Berg\",\n    \"birth_date\": \"1990-01-01\",\n    \"gender\": \"Male\",\n    \"nationality_id\": \"ZA\",\n    \"preferred_language_id\": \"EN\",\n    \"phone\": \"+27110001234\",\n    \"mobile\": \"+27821234567\",\n    \"contact_time\": \"09h00\",\n    \"residence_indicator\": \"Permanent\",\n    \"residence_country_id\": \"ZA\",\n    \"identity_type\": \"RSA ID\",\n    \"id_number\": \"9001015009087\",\n    \"id_issue_date\": \"2008-01-15\",\n    \"identity_issue_country\": \"ZA\",\n    \"pep_pip_declaration\": false,\n    \"street\": \"42 Long Street\",\n    \"street2\": \"Unit 5\",\n    \"suburb\": \"Gardens\",\n    \"city_id\": \"Cape Town\",\n    \"state_id\": \"Western Cape\",\n    \"zip\": \"8001\",\n    \"country_id\": \"ZA\",\n    \"address_type\": \"Residential\",\n    \"residence_status\": \"Owner\",\n    \"postal_address\": false,\n    \"company_type\": \"Private Company\",\n    \"employment_number\": \"EMP001\",\n    \"employment_status\": \"Employed\",\n    \"spendl_source_of_funds_id\": \"Salary\",\n    \"spendl_account_purpose\": \"Savings and Investments\",\n    \"accept_terms_and_conditions\": \"2026-01-29T10:00:00Z\"\n  }\n}"
             }
           },
           "event": [
@@ -169,7 +169,7 @@
           ]
         },
         {
-          "name": "Ingest (TaskFlow batch)",
+          "name": "Ingest (flat-format batch)",
           "request": {
             "method": "POST",
             "header": [
@@ -299,7 +299,7 @@
             "url": { "raw": "{{baseUrl}}/api/debt/ingest", "host": ["{{baseUrl}}"], "path": ["api", "debt", "ingest"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"guid\": \"7D9B408607114EA288FD0F5CD629EB6F\",\n    \"machine\": \"WINDOWS-PC\",\n    \"client_no\": \"00000000240247\",\n    \"loan_ref_no\": \"176412_92129\",\n    \"first_dt\": \"20260331\",\n    \"date_adj\": 4,\n    \"frequency\": 2,\n    \"track_cd\": \"03\",\n    \"total_amt\": 1302332,\n    \"inst_amt\": 15000,\n    \"status\": \"0\",\n    \"account_type\": 0,\n    \"bank_acc_no\": \"2055177865\",\n    \"bank_branch_cd\": \"470010\",\n    \"pmt_stream\": \"ACOL\",\n    \"inst_adj_amt\": 0,\n    \"inst_adj_rate\": 0,\n    \"allow_tracking\": \"T\",\n    \"allow_date_chg\": \"T\",\n    \"allow_max_inst\": \"F\",\n    \"allow_any_cell_no\": \"T\",\n    \"allow_scheduling\": \"T\",\n    \"mode\": \"Realtime\",\n    \"wait_response\": \"F\",\n    \"api_callback\": \"https://bridge.taskflow.co.za/amplifin/response\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"guid\": \"0123456789ABCDEF0123456789ABCDEF\",\n    \"machine\": \"WINDOWS-PC\",\n    \"client_no\": \"00000000123456\",\n    \"loan_ref_no\": \"123456_12345\",\n    \"first_dt\": \"20260331\",\n    \"date_adj\": 4,\n    \"frequency\": 2,\n    \"track_cd\": \"03\",\n    \"total_amt\": 1800000,\n    \"inst_amt\": 150000,\n    \"status\": \"0\",\n    \"account_type\": 0,\n    \"bank_acc_no\": \"1234567890\",\n    \"bank_branch_cd\": \"470010\",\n    \"pmt_stream\": \"ACOL\",\n    \"inst_adj_amt\": 0,\n    \"inst_adj_rate\": 0,\n    \"allow_tracking\": \"T\",\n    \"allow_date_chg\": \"T\",\n    \"allow_max_inst\": \"F\",\n    \"allow_any_cell_no\": \"T\",\n    \"allow_scheduling\": \"T\",\n    \"mode\": \"Realtime\",\n    \"wait_response\": \"F\",\n    \"api_callback\": \"https://partner.example.com/debt/response\"\n  }\n}"
             }
           },
           "event": [
@@ -312,7 +312,7 @@
                   "pm.test('success is true', () => pm.expect(json.success).to.eql(true));",
                   "pm.test('obligation object present', () => pm.expect(json.obligation).to.be.an('object'));",
                   "pm.test('processingStatus is callback_sent', () => pm.expect(json.obligation.processingStatus).to.eql('callback_sent'));",
-                  "pm.test('guid matches', () => pm.expect(json.obligation.guid).to.eql('7D9B408607114EA288FD0F5CD629EB6F'));",
+                  "pm.test('guid matches', () => pm.expect(json.obligation.guid).to.eql('0123456789ABCDEF0123456789ABCDEF'));",
                   "if (json.obligation) { pm.environment.set('lastDebtGuid', json.obligation.guid); }"
                 ],
                 "type": "text/javascript"

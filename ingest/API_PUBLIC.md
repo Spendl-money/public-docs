@@ -46,7 +46,7 @@ Content-Type: application/json
 
 ## Step 2: Ingest Data
 
-Send user data to Spendl. The API accepts single users, batches, or TaskFlow-formatted payloads.
+Send user data to Spendl. The API accepts single users, batches, or flat-format payloads.
 
 ### Request
 ```
@@ -76,7 +76,7 @@ Content-Type: application/json
 }
 ```
 
-#### TaskFlow Format
+#### Flat Format
 ```json
 {
   "data": {
@@ -292,9 +292,9 @@ Or if invalid:
 
 ## Step 5: Ingest Debt Obligations
 
-Submit debt obligation data from TaskFlow. Igor will persist the record, forward it to the Spendl backend, and send a callback to the provided `api_callback` URL.
+Submit debt obligation data. The API will persist the record, forward it to the Spendl backend, and send a callback to the provided `api_callback` URL.
 
-> **Prerequisite**: The `client_no` in the debt payload must match an existing user's `clientNo` field. Users must be ingested first (Step 2) with a `client_no` in the TaskFlow payload.
+> **Prerequisite**: The `client_no` in the debt payload must match an existing user's `clientNo` field. Users must be ingested first (Step 2) with a `client_no` in the flat-format payload.
 
 ### Request
 ```
@@ -307,19 +307,19 @@ Content-Type: application/json
 ```json
 {
   "data": {
-    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+    "guid": "0123456789ABCDEF0123456789ABCDEF",
     "machine": "WINDOWS-PC",
-    "client_no": "00000000240247",
-    "loan_ref_no": "176412_92129",
+    "client_no": "00000000123456",
+    "loan_ref_no": "123456_12345",
     "first_dt": "20260331",
     "date_adj": 4,
     "frequency": 2,
     "track_cd": "03",
-    "total_amt": 1302332,
-    "inst_amt": 15000,
+    "total_amt": 1800000,
+    "inst_amt": 150000,
     "status": "0",
     "account_type": 0,
-    "bank_acc_no": "2055177865",
+    "bank_acc_no": "1234567890",
     "bank_branch_cd": "470010",
     "pmt_stream": "ACOL",
     "inst_adj_amt": 0,
@@ -331,7 +331,7 @@ Content-Type: application/json
     "allow_scheduling": "T",
     "mode": "Realtime",
     "wait_response": "F",
-    "api_callback": "https://bridge.taskflow.co.za/amplifin/response"
+    "api_callback": "https://partner.example.com/debt/response"
   }
 }
 ```
@@ -369,9 +369,9 @@ Content-Type: application/json
   "success": true,
   "obligation": {
     "_id": "507f1f77bcf86cd799439011",
-    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
-    "clientNo": "00000000240247",
-    "loanRefNo": "176412_92129",
+    "guid": "0123456789ABCDEF0123456789ABCDEF",
+    "clientNo": "00000000123456",
+    "loanRefNo": "123456_12345",
     "processingStatus": "callback_sent",
     "replyCd": "207",
     "replyStr": "Successful",
@@ -384,10 +384,10 @@ Content-Type: application/json
 After processing, a POST is sent to your `api_callback` URL with the original data plus result fields:
 ```json
 {
-  "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+  "guid": "0123456789ABCDEF0123456789ABCDEF",
   "machine": "WINDOWS-PC",
-  "client_no": "9011290136082",
-  "loan_ref_no": "171407_92133",
+  "client_no": "00000000123456",
+  "loan_ref_no": "123456_12345",
   "reply_cd": "207",
   "reply_str": "Successful"
 }
@@ -420,8 +420,8 @@ Authorization: Bearer <accessToken>
 {
   "obligation": {
     "_id": "507f1f77bcf86cd799439011",
-    "guid": "7D9B408607114EA288FD0F5CD629EB6F",
-    "clientNo": "00000000240247",
+    "guid": "0123456789ABCDEF0123456789ABCDEF",
+    "clientNo": "00000000123456",
     "processingStatus": "callback_sent",
     "replyCd": "207",
     "replyStr": "Successful",
@@ -435,8 +435,8 @@ Authorization: Bearer <accessToken>
 |--------|-------------|
 | `pending` | Obligation received and persisted, not yet forwarded |
 | `forwarded` | Successfully forwarded to Spendl backend |
-| `callback_sent` | Callback sent to TaskFlow — fully complete |
-| `callback_failed` | Forwarding to Spendl backend succeeded, but the TaskFlow callback failed — obligation processing is complete, notification is not |
+| `callback_sent` | Callback sent — fully complete |
+| `callback_failed` | Forwarding to Spendl backend succeeded, but the callback failed — obligation processing is complete, notification is not |
 | `failed` | Processing failed (see `errorMessage` for details) |
 
 ---
@@ -462,7 +462,7 @@ Authorization: Bearer <accessToken>
 |-------|------|-------|
 | createdByApiKeyId | string | API key that created the user (auto-populated) |
 | createdByTenant | string | null | Organization name from API key label (auto-populated) |
-| clientNo | string | null | External client reference (set from TaskFlow `client_no`, used for debt obligation lookup) |
+| clientNo | string | null | External client reference (set from the flat-format `client_no`, used for debt obligation lookup) |
 
 ### Core User Fields
 | Field | Type | Required | Notes |
@@ -527,19 +527,19 @@ curl -X POST "https://ingest.spendl.money/api/debt/ingest" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "data": {
-      "guid": "7D9B408607114EA288FD0F5CD629EB6F",
+      "guid": "0123456789ABCDEF0123456789ABCDEF",
       "machine": "WINDOWS-PC",
-      "client_no": "00000000240247",
-      "loan_ref_no": "176412_92129",
+      "client_no": "00000000123456",
+      "loan_ref_no": "123456_12345",
       "first_dt": "20260331",
       "date_adj": 4,
       "frequency": 2,
       "track_cd": "03",
-      "total_amt": 1302332,
-      "inst_amt": 15000,
+      "total_amt": 1800000,
+      "inst_amt": 150000,
       "status": "0",
       "account_type": 0,
-      "bank_acc_no": "2055177865",
+      "bank_acc_no": "1234567890",
       "bank_branch_cd": "470010",
       "pmt_stream": "ACOL",
       "inst_adj_amt": 0,
@@ -551,14 +551,14 @@ curl -X POST "https://ingest.spendl.money/api/debt/ingest" \
       "allow_scheduling": "T",
       "mode": "Realtime",
       "wait_response": "F",
-      "api_callback": "https://bridge.taskflow.co.za/amplifin/response"
+      "api_callback": "https://partner.example.com/debt/response"
     }
   }'
 ```
 
 ### cURL — Check Debt Status
 ```bash
-curl -X GET "https://ingest.spendl.money/api/debt/status/7D9B408607114EA288FD0F5CD629EB6F" \
+curl -X GET "https://ingest.spendl.money/api/debt/status/0123456789ABCDEF0123456789ABCDEF" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -595,4 +595,4 @@ For questions or technical issues, contact your Spendl integration partner.
 
 ---
 
-**Last Updated:** February 2026 — Added debt obligation ingestion from TaskFlow (Steps 5 & 6)
+**Last Updated:** February 2026 — Added debt obligation ingestion (Steps 5 & 6)
